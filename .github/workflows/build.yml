@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,3 +35,15 @@ jobs:
         with:
           name: flaugram-apk
           path: FlauGram/android/app/build/outputs/apk/debug/app-debug.apk
+
+      # Публикуем релиз: именно оттуда приложение берёт обновления и там же лежит ссылка на скачивание
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CODE=$(grep -oP 'versionCode\s+\K[0-9]+' FlauGram/android/app/build.gradle | head -1)
+          NAME=$(grep -oP "versionName\s+'\K[^']+" FlauGram/android/app/build.gradle | head -1)
+          cp FlauGram/android/app/build/outputs/apk/debug/app-debug.apk FlauGram.apk
+          gh release delete "v$CODE" --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+          gh release create "v$CODE" FlauGram.apk --repo "$GITHUB_REPOSITORY" \
+            --title "FlauGram $NAME" --notes "FlauGram $NAME" --latest --target "$GITHUB_SHA"
